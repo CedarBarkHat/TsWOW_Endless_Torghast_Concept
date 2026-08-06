@@ -102,6 +102,6 @@ export function persistTreeState(_state: CharacterTreeState): void {
  */
 export function Main(_events: unknown /* TSEvents */): void {
   // events.Player.OnCommand((player, command, found) => {
-  //   TODO: "#tree" opens the passive tree; "#allocate <nodeId>" allocates.
+  //   TODO(phase1): "#tree" opens the passive tree; "#allocate <nodeId>" allocates.
   // });
 }

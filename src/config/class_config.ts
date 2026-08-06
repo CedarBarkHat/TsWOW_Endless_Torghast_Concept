@@ -11,13 +11,11 @@
 
 // import { std } from 'wow/wotlk'; // TODO(tswow): enable to create the class
 
-import {
-  ARMOR_POWER_CORE,
-  MAGIC_SHIELD_CORE,
-  EVASION_CRIT_CORE,
-  type CoreAbility,
-} from '../datascripts/abilities_core';
-import { Direction } from '../datascripts/passive_tree';
+import { CORE_ABILITIES_BY_DIRECTION } from '../datascripts/abilities_core';
+
+// Re-export so the class config remains the one-stop place to see what a
+// character ships with, while abilities_core.ts stays the single source of truth.
+export { CORE_ABILITIES_BY_DIRECTION };
 
 /**
  * Level-1 base stats for the class. Every character enters Torghast floor 1 with
@@ -76,19 +74,12 @@ export const CLASS_CONFIG: ClassConfig = {
   baseStats: BASE_STATS_LEVEL_1,
 };
 
-/**
- * Core ability sets grouped by build direction, referenced from abilities_core.
- * A character technically starts with the full set; direction only reflects which
- * abilities the passive tree is best positioned to enhance.
- * TODO(design): decide whether floor-1 characters get ALL core abilities or pick
- * a starting direction (see DESIGN_SPEC "Core Abilities" — 5–8 per direction).
- */
-export const CORE_ABILITIES_BY_DIRECTION: Record<Direction, CoreAbility[]> = {
-  [Direction.ARMOR_POWER]: ARMOR_POWER_CORE,
-  [Direction.MAGIC_SHIELD]: MAGIC_SHIELD_CORE,
-  [Direction.EVASION_CRIT]: EVASION_CRIT_CORE,
-  [Direction.CONNECTOR]: [], // connectors have no abilities of their own
-};
+// Core ability sets grouped by build direction come from abilities_core.ts
+// (CORE_ABILITIES_BY_DIRECTION, re-exported above). A character technically
+// starts with the full set; direction only reflects which abilities the passive
+// tree is best positioned to enhance.
+// TODO(design): decide whether floor-1 characters get ALL core abilities or pick
+// a starting direction (see DESIGN_SPEC "Core Abilities" — 5–8 per direction).
 
 // ---------------------------------------------------------------------------
 // TSWOW registration (STUB)

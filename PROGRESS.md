@@ -4,23 +4,51 @@ Living status of the Endless Torghast custom class. Updated as work lands.
 Roadmap: [`docs/IMPLEMENTATION_ROADMAP.md`](docs/IMPLEMENTATION_ROADMAP.md) ·
 Decisions: [`docs/DECISIONS.md`](docs/DECISIONS.md)
 
-_Last updated: 2026-08-06 — initial scaffolding pass._
+_Last updated: 2026-08-06 — **Phase 1 started** (abilities populated, tree
+structure + stat-pool mapping, modifier handling)._
+
+> ## ⚠️ Two inputs were expected this session but weren't available
+> 1. **Design spec is v1.2 in this repo, not v1.3.** The requested "Itemization
+>    System" section (rarity tiers, directional gear, procs, jewels, enchants) is
+>    **not present**. Stat pools were derived from the existing **"Stat Mapping
+>    (MySQL Integration)"** table instead. Drop the v1.3 spec into
+>    `docs/DESIGN_SPEC.md` to reconcile (`STAT_POOLS` in `passive_tree.ts` carries
+>    a `TODO(design)` for this).
+> 2. **No MySQL data.** The provided path was still the literal
+>    `[INSERT YOUR PATH: ...]` template and no known dump location exists, so real
+>    spell values could not be read. Ability numbers are **hand-authored relative
+>    placeholders** tagged `TODO(mysql)` / `TODO(balance)`.
 
 ---
 
-## ✅ Started (skeletons in place)
+## 🟡 Phase 1 — STARTED
 
-**Phase 1 — Passive Tree Infrastructure**
-- `src/datascripts/passive_tree.ts` — full data model (`PassiveNode`, `PassiveTree`,
-  `CharacterTreeState`), enums (Direction / NodeKind / StatType), a
-  `generatePassiveTree()` **stub**, and working validation/reachability/`canAllocate`
-  helpers.
-- `src/datascripts/keystones.ts` — all 6 keystones fully specified as data with
-  tunable `params` and a `KeystoneHook` per keystone.
+### Populated this pass
+- `src/datascripts/abilities_core.ts` — 18 core abilities (6 per direction) now
+  carry **relative placeholder values**: `baseDamage`, `scalingCoeff`,
+  `cooldownSec`, `resourceCost`, plus a new `ResourceType` (rage / mana / energy).
+  Values express each ability's *shape*, not balance. `TODO(mysql)`/`TODO(balance)`.
+- `src/datascripts/passive_tree.ts` — added `STAT_POOLS` (which stats each
+  direction offers, from the spec's Stat Mapping table), a `statBelongsToDirection`
+  helper, a `ModifierAspect` enum, and a `modifierAspect` field on `PassiveNode`.
+  A comment points to `keystones.ts` for the 6 keystones (kept there to avoid a
+  circular import).
+- `src/livescripts/stat_application.ts` — added `aggregateAbilityModifiers()` +
+  `applyAbilityModifiers()` so MODIFIER nodes accumulate per-ability, per-aspect
+  bonuses (damage / cooldown / area / resource / duration). Wired (stubbed) into
+  `recalculateStats()`.
+- `src/config/class_config.ts` — de-duplicated `CORE_ABILITIES_BY_DIRECTION`
+  (now single-sourced from `abilities_core.ts`).
+
+### Already in place (previous scaffolding pass)
+**Passive Tree Infrastructure**
+- `src/datascripts/passive_tree.ts` — data model (`PassiveNode`, `PassiveTree`,
+  `CharacterTreeState`), enums, `generatePassiveTree()` **stub**, and working
+  validation / reachability / `canAllocate` helpers.
+- `src/datascripts/keystones.ts` — all 6 keystones as data with tunable `params`
+  and a `KeystoneHook` each.
 
 **Ability system (datascripts)**
-- `src/datascripts/abilities_core.ts` — 18 core abilities (6 per direction) with
-  placeholder stats.
 - `src/datascripts/abilities_shop.ts` — starter shop pool + 4 shop categories.
 - `src/datascripts/anima_currency.ts` — drop table (10–50 group / 50–200 boss),
   scaling hook, and the `character_anima` schema.
@@ -54,32 +82,45 @@ _Last updated: 2026-08-06 — initial scaffolding pass._
   all in `balance_tuning.ts` and implemented.
 - **Keystone data** — the 6 keystones are specified; only their runtime hooks await
   Phase 3.
+- **Stat pools** — `STAT_POOLS` now defines which stats each direction offers, so
+  node generation has a valid stat set to draw from per direction.
+- **Ability shape** — core abilities have relative placeholder values, enough to
+  reason about rotations and to be enhanced by modifier nodes.
 
 ---
 
-## 🔴 Blocked — waiting on MySQL data / decisions
+## 🔴 Still TODO / blocked
 
-Marked in code as `TODO(mysql)` / `TODO(design)`:
-- **Real ability values** — base spell ids, base damage, scaling coefficients,
-  cooldowns (`abilities_core.ts`, `abilities_shop.ts`). Need the `spells` export.
-- **Real node stat values + stat ids** — the 300 nodes' magnitudes and their mapping
-  to `character_stats` (`passive_tree.ts`).
+**Node generation (the big remaining Phase 1 item)** — `generatePassiveTree()` and
+`buildDirectionCluster()` are still stubs. The 299 non-origin nodes aren't created
+yet. Blocked only on a design confirmation (layout/coordinates + how many
+modifier nodes per cluster), not on MySQL. `TODO(phase1)` / `TODO(design)`.
+
+**Waiting on MySQL data** (`TODO(mysql)`):
+- **Real ability values** — base spell ids, base damage, scaling coefficients
+  (`abilities_core.ts`, `abilities_shop.ts`). Need the `spells` export.
+- **Real node stat magnitudes + stat ids** — mapping `StatType` to
+  `character_stats` rows (`passive_tree.ts`).
 - **Base-stat read/write** — the gear/core stat pipeline integration
   (`stat_application.ts` `readBaseStat`/`writeStat`).
-- **Starting gear / floor-1 base stats** (`class_config.ts`).
-- **Open design questions** — shop frequency, anima carry-over, respec rules,
-  adjacency rule, 3rd keystone per direction (see `docs/DECISIONS.md`).
+
+**Waiting on design decisions** (`TODO(design)`):
+- v1.3 spec + Itemization System (reconcile `STAT_POOLS`, gear stat pools).
+- Starting gear / floor-1 base stats (`class_config.ts`).
+- Shop frequency, anima carry-over, respec rules, adjacency rule, resource model
+  per direction, 3rd keystone per direction (see `docs/DECISIONS.md`).
 
 ---
 
 ## ▶️ Next immediate steps
 
-1. **Fill `generatePassiveTree()`** — build one direction's cluster end-to-end
-   (`buildDirectionCluster`) and get `validateTree()` passing for it.
-2. **Add tests** for `aggregateBonuses()` and `validateTree()` — pure functions,
-   no server required. (No test harness is set up yet — pick one.)
-3. **Resolve the top open decisions** (shop frequency, adjacency rule) so the
-   allocation + shop skeletons can be finished.
+1. **Drop in the v1.3 spec** with the Itemization System, then reconcile
+   `STAT_POOLS` and gear stat pools.
+2. **Fill `generatePassiveTree()`** — build one direction's cluster end-to-end
+   (`buildDirectionCluster`) using `STAT_POOLS`, and get `validateTree()` passing.
+3. **Add tests** for `aggregateBonuses()`, `aggregateAbilityModifiers()`, and
+   `validateTree()` — all pure functions, no server required. (No test harness set
+   up yet — pick one.)
 4. **Get the MySQL export** and start replacing `TODO(mysql)` placeholders,
    beginning with core ability spell ids.
 5. **Wire a TSWOW module entry point** that calls the `register*()` functions once

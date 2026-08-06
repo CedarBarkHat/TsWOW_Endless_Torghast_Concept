@@ -64,6 +64,21 @@ export enum StatType {
   NONE = 'none',
 }
 
+/**
+ * What aspect of an ability a MODIFIER node changes. Mirrors the modifier-node
+ * examples in DESIGN_SPEC.md "Ability Enhancement Through Passive Tree"
+ * (e.g. "+15% Fireball damage", "+20% Overhead Smash stun duration",
+ * "+25% Ice Storm area size", "+10% mana efficiency").
+ * TODO(design): confirm the final aspect list per ability.
+ */
+export enum ModifierAspect {
+  DAMAGE = 'damage',                 // +X% ability damage
+  COOLDOWN_REDUCTION = 'cooldown',   // -X% cooldown
+  AREA = 'area',                     // +X% area/radius
+  RESOURCE_EFFICIENCY = 'resource',  // -X% resource cost
+  DURATION = 'duration',             // +X% effect/CC duration
+}
+
 // ---------------------------------------------------------------------------
 // Core interfaces
 // ---------------------------------------------------------------------------
@@ -87,9 +102,10 @@ export interface PassiveNode {
   /** Stat this node modifies (NONE for keystones / modifiers). */
   statType: StatType;
   /** Magnitude of the bonus, interpreted per `kind`:
-   *  - SMALL: additive percent (2 => +2%)
-   *  - BIG:   multiplier percent (5 => x1.05)
-   *  - KEYSTONE/MODIFIER: unused (0) — behavior defined elsewhere.
+   *  - SMALL:    additive percent (2 => +2%)
+   *  - BIG:      multiplier percent (5 => x1.05)
+   *  - MODIFIER: percent applied to `modifierAspect` (15 => +15% damage)
+   *  - KEYSTONE: unused (0) — behavior defined in keystones.ts.
    *  TODO(balance): all values are placeholders until the balance pass. */
   statValue: number;
 
@@ -100,6 +116,8 @@ export interface PassiveNode {
 
   /** For MODIFIER nodes: the ability this node enhances (id from abilities_*). */
   modifiesAbilityId?: string;
+  /** For MODIFIER nodes: which aspect of that ability it changes (default DAMAGE). */
+  modifierAspect?: ModifierAspect;
 
   /** UI position. TODO(design): decide hand-authored vs generated coordinates. */
   x: number;
@@ -145,6 +163,65 @@ export const DIRECTION_BUDGET: Record<Direction, {
 };
 
 // ---------------------------------------------------------------------------
+// Stat pools per direction
+// ---------------------------------------------------------------------------
+
+/**
+ * Which stats each direction's nodes may grant. Derived from DESIGN_SPEC.md
+ * "Stat Mapping (MySQL Integration)" — the table there assigns every gear stat
+ * to a direction. (The spec's planned "Itemization System" section, which would
+ * refine gear rarity/jewels/enchants, is not yet in this repo copy — v1.2 — so
+ * stat pools come from the Stat Mapping table for now. TODO(design): reconcile
+ * with the Itemization System once v1.3 lands.)
+ *
+ * ATTACK_SPEED / CAST_SPEED are "scattered" in the spec, so they appear in the
+ * direction(s) where they fit. CONNECTOR nodes borrow from the two directions
+ * they bridge rather than owning a fixed pool.
+ */
+export const STAT_POOLS: Record<Direction, StatType[]> = {
+  [Direction.ARMOR_POWER]: [
+    StatType.ARMOR,
+    StatType.MAX_HEALTH,
+    StatType.STRENGTH,
+    StatType.ATTACK_SPEED, // scattered
+  ],
+  [Direction.MAGIC_SHIELD]: [
+    StatType.INTELLECT,
+    StatType.SPELL_POWER,
+    StatType.ENERGY_SHIELD,
+    StatType.MANA,
+    StatType.RESIST_ALL,
+    StatType.CAST_SPEED, // scattered
+  ],
+  [Direction.EVASION_CRIT]: [
+    StatType.DEXTERITY,
+    StatType.CRIT_CHANCE,
+    StatType.CRIT_MULTIPLIER,
+    StatType.DODGE,
+    StatType.ATTACK_SPEED, // scattered
+  ],
+  // Connectors bridge two directions; no dedicated pool. TODO(design): decide
+  // whether connectors offer a light hybrid stat or are pure pathing nodes.
+  [Direction.CONNECTOR]: [],
+};
+
+/** True if `stat` is valid for a node in `direction` (used by validation/gen). */
+export function statBelongsToDirection(direction: Direction, stat: StatType): boolean {
+  if (stat === StatType.NONE) return true; // keystones/modifiers carry no stat
+  return STAT_POOLS[direction].includes(stat);
+}
+
+// ---------------------------------------------------------------------------
+// Keystones
+// ---------------------------------------------------------------------------
+//
+// The 6 keystones (2 per direction) with full names, descriptions, tunable
+// params, and runtime hooks live in ./keystones.ts (KEYSTONES / KEYSTONE_BY_ID).
+// They are intentionally kept in their own module to avoid a circular import
+// (keystones.ts imports Direction from here). A PassiveNode references a keystone
+// via its `keystoneId` field. See keystones.ts.
+
+// ---------------------------------------------------------------------------
 // Generation (STUB)
 // ---------------------------------------------------------------------------
 
@@ -176,7 +253,7 @@ export function generatePassiveTree(): PassiveTree {
     isKeystone: false,
     x: 0,
     y: 0,
-    connections: [], // TODO: connect to first node of each direction
+    connections: [], // TODO(phase1): connect to first node of each direction
   });
 
   // TODO(phase1): populate the remaining 299 nodes here.

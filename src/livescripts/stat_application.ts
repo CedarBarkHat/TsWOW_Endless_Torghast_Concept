@@ -21,7 +21,7 @@ import type {
   CharacterTreeState,
   StatType,
 } from '../datascripts/passive_tree';
-import { NodeKind } from '../datascripts/passive_tree';
+import { NodeKind, ModifierAspect } from '../datascripts/passive_tree';
 
 /**
  * Aggregated passive bonuses for one stat, split by how they combine.
@@ -75,13 +75,77 @@ export function aggregateBonuses(
         // Keystones are scripted separately (see applyKeystones).
         break;
       case NodeKind.MODIFIER:
-        // Ability modifiers are applied to abilities, not base stats.
-        // TODO(phase4): route to ability enhancement (abilities_*).
+        // Ability modifiers apply to a specific ability, not a base stat.
+        // Collected separately by aggregateAbilityModifiers(); nothing to do here.
         break;
     }
   }
 
   return bonuses;
+}
+
+/**
+ * Per-ability modifier bonuses, keyed by aspect (damage / cooldown / ...).
+ * Values are additive fractions per aspect (0.15 = +15%). How each aspect is
+ * finally applied (e.g. cooldown as a *reduction*) is decided in
+ * applyAbilityModifiers().
+ */
+export type AbilityModifier = Map<ModifierAspect, number>;
+
+/** Map of ability id -> its accumulated modifier bonuses. */
+export type AbilityModifierMap = Map<string, AbilityModifier>;
+
+/**
+ * Aggregate all allocated MODIFIER nodes into per-ability bonuses.
+ * Pure + testable, like aggregateBonuses(). Modifier nodes carry the ability id
+ * (`modifiesAbilityId`) and the aspect (`modifierAspect`, default DAMAGE); their
+ * `statValue` is the percent.
+ */
+export function aggregateAbilityModifiers(
+  tree: PassiveTree,
+  state: CharacterTreeState,
+): AbilityModifierMap {
+  const mods: AbilityModifierMap = new Map();
+
+  for (const nodeId of state.allocated) {
+    const node: PassiveNode | undefined = tree.nodes.get(nodeId);
+    if (!node || node.kind !== NodeKind.MODIFIER) continue;
+    if (!node.modifiesAbilityId) continue; // malformed modifier node; skip
+
+    const aspect = node.modifierAspect ?? ModifierAspect.DAMAGE;
+    let byAspect = mods.get(node.modifiesAbilityId);
+    if (!byAspect) {
+      byAspect = new Map();
+      mods.set(node.modifiesAbilityId, byAspect);
+    }
+    // Same aspect stacks additively (e.g. two "+15% Fireball damage" => +30%).
+    byAspect.set(aspect, (byAspect.get(aspect) ?? 0) + node.statValue / 100);
+  }
+
+  return mods;
+}
+
+/**
+ * Apply an ability's accumulated modifiers to its base values.
+ * Returns adjusted numbers; does NOT mutate the ability definition.
+ * TODO(phase4): feed the real CoreAbility (from abilities_core.ts) through this
+ * when spells are registered, and route the result into the cast/damage code.
+ */
+export function applyAbilityModifiers(
+  base: { baseDamage: number; cooldownSec: number; resourceCost: number },
+  mod: AbilityModifier | undefined,
+): { baseDamage: number; cooldownSec: number; resourceCost: number } {
+  if (!mod) return { ...base };
+  const damagePct = mod.get(ModifierAspect.DAMAGE) ?? 0;
+  const cdReductionPct = mod.get(ModifierAspect.COOLDOWN_REDUCTION) ?? 0;
+  const resourcePct = mod.get(ModifierAspect.RESOURCE_EFFICIENCY) ?? 0;
+  // AREA / DURATION aspects don't map onto these three fields — they're applied
+  // at cast time. TODO(phase4): thread AREA/DURATION into the spell effects.
+  return {
+    baseDamage: base.baseDamage * (1 + damagePct),
+    cooldownSec: base.cooldownSec * (1 - cdReductionPct),
+    resourceCost: base.resourceCost * (1 - resourcePct),
+  };
 }
 
 /**
@@ -104,12 +168,17 @@ export function recalculateStats(
   state: CharacterTreeState,
 ): void {
   const bonuses = aggregateBonuses(tree, state);
+  const abilityMods = aggregateAbilityModifiers(tree, state);
 
   // TODO(phase2): for each StatType:
   //   const base = readBaseStat(state.characterId, stat); // from gear/core
   //   const final = applyBonus(base, bonuses.get(stat));
   //   writeStat(state.characterId, stat, final);           // to core
   void bonuses; // referenced to keep intent clear until phase 2 lands.
+
+  // TODO(phase4): for each owned ability, run applyAbilityModifiers(ability,
+  //   abilityMods.get(ability.id)) and push the adjusted values into the spell.
+  void abilityMods;
 
   applyKeystones(tree, state);
 }

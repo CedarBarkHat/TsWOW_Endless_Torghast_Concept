@@ -40,6 +40,16 @@ raised by the skeleton. Resolve and move up to the tables above.
 - [ ] **Ability cost balance:** are 50–200 anima prices right?
 - [ ] **New ability vs mastery ratio** in shop rotations.
 - [ ] **Starting gear / base stats** for floor 1.
+- [ ] **Resource model per direction:** the skeleton assumes rage (Armor&Power),
+  mana (Magic&ES), energy (Evasion&Crit) via `ResourceType` in `abilities_core.ts`.
+  Confirm, and decide rage generation amounts on basic attacks.
+
+### Itemization / spec sync
+- [ ] **v1.3 Itemization System not in repo:** the repo's `DESIGN_SPEC.md` is v1.2
+  and has no Itemization section (rarity tiers, directional gear, procs, jewels,
+  enchants). `STAT_POOLS` (`passive_tree.ts`) was derived from the v1.2 "Stat
+  Mapping" table as a stand-in. Add v1.3 and reconcile the per-direction stat pools
+  against the real itemization gear stats.
 
 ### Passive tree
 - [ ] **Refund system:** can keystones ever be refunded? *(Spec recommends: no, permanent.)*
