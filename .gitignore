@@ -1,0 +1,15 @@
+# Node / TypeScript
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# TSWOW build artifacts (generated when integrated into a module)
+*.log
+.trienv/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
